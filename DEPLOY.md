@@ -3,50 +3,103 @@
 The challenge requires: *"A number or link we can call, live for at least a week
 after submission."* Localhost does not satisfy that.
 
-## Recommended: Render free tier
+---
 
-Free web services **spin down after ~15 minutes of inactivity** and cold-start in
-roughly 30-50 seconds. That is acceptable here with one mitigation (below), and it
-is honest to mention it in the submission email.
+## Why NOT Netlify
+
+Netlify is built for static sites and **serverless functions**, not long-lived
+servers. Three concrete blockers for this app:
+
+1. **No persistent process.** This is an Express server holding an in-memory
+   session map (`src/core/agent.js`) across turns of the same call. Serverless
+   functions are stateless and die after each request, so call state would be
+   lost between turns.
+2. **No writable disk.** `node:sqlite` writes `data/aranya.db`. Netlify Functions
+   have a read-only filesystem apart from `/tmp`, which is wiped per invocation.
+   The CRM stand-in and the post-call view would not survive.
+3. **60-second synchronous function cap.** Not fatal on its own, but combined with
+   the above it means a rewrite, not a deploy.
+
+Netlify *does* have a long-lived "Netlify Server" product, but it is **Early
+Access** and explicitly limited/subject to change — the wrong thing to bet a
+submission deadline on.
+
+**Verdict: use Render.** It runs the app as-is, free, with no code changes.
+If you specifically want Netlify, the honest path is splitting the frontend
+(`public/`) onto Netlify and still hosting the backend on Render — which is more
+moving parts for zero benefit here.
+
+---
+
+## Recommended: Render free tier (~15 minutes)
+
+`render.yaml` is already in the repo, so Render configures itself.
 
 ### Steps
 
-1. Push this folder to a **public GitHub repo** (`data/`, `.env` and `node_modules/`
-   are already git-ignored).
-2. On https://render.com → **New → Web Service** → connect the repo.
-   `render.yaml` is detected automatically.
-3. Add the four secret env vars when prompted (they are marked `sync: false`
-   so they are never committed):
-   - `GROQ_API_KEY`
-   - `GROQ_API_KEY_FALLBACK`
-   - `AWS_ACCESS_KEY_ID`
-   - `AWS_SECRET_ACCESS_KEY`
-4. Deploy. Health check is `/api/health`.
+1. Go to **https://render.com** and sign in **with GitHub**.
+2. **New → Web Service** → select
+   `Varshith4570/AI-Pre-Sales-Voice-Agent-for-Real-Estate`.
+3. Render reads `render.yaml` and fills in build/start commands. Confirm:
+   - Build: `npm install`
+   - Start: `node src/server.js`
+   - Health check: `/api/health`
+   - Plan: **Free**, Region: **Singapore** (closest to Hyderabad)
+4. Add the secret environment variables (they are marked `sync: false`, so they
+   are never in the repo):
 
-### Keep it warm
-Free instances sleep. Point a free uptime pinger (cron-job.org, UptimeRobot) at
-`https://<your-app>.onrender.com/api/health` every 10 minutes. Cheap insurance
-against a cold start during the graders' first call.
+   | Key | Value |
+   |---|---|
+   | `GROQ_API_KEY` | your Groq key |
+   | `GROQ_API_KEY_FALLBACK` | your second Groq key |
+   | `AWS_ACCESS_KEY_ID` | Polly-only IAM user (see warning below) |
+   | `AWS_SECRET_ACCESS_KEY` | that user's secret |
+
+5. **Create Web Service.** First build takes 2-4 minutes.
+6. Open `https://<your-app>.onrender.com/api/health` — expect `{"ok":true,...}`.
+7. Test the call page at `https://<your-app>.onrender.com/`.
+
+### SECURITY WARNING - read before step 4
+
+The AWS keys currently in `.env` are **Infinall production credentials**. Do not
+put those on a third-party host for a job application. Create a dedicated user:
+
+1. AWS Console → **IAM → Users → Create user** (e.g. `aranya-polly-demo`).
+2. Attach **only** the AWS managed policy `AmazonPollyReadOnlyAccess`
+   (`polly:SynthesizeSpeech` is all this app needs).
+3. **Create access key** → *Application running outside AWS* → copy both values.
+4. Use those on Render. Delete the user after the final round.
+
+That key can do nothing except turn text into speech.
+
+### Keep it awake
+Render free instances sleep after ~15 minutes idle and cold-start in 30-50 s.
+Point a free pinger (cron-job.org or UptimeRobot) at
+`https://<your-app>.onrender.com/api/health` every 10 minutes.
+
+Mention the cold start in the submission email. It is a free-tier constraint the
+challenge explicitly tolerates (*"Free tiers and trial credits are fine"*), and
+naming it is better than a grader hitting a 40-second blank page.
 
 ### Known constraint: the database resets
-Render's free tier has an **ephemeral filesystem** — `data/aranya.db` is wiped on
-every redeploy and on wake from sleep. Calls recorded during grading persist for
-that session, which is enough for the demo, but the three submitted recordings are
-exported to `evidence/recordings/` precisely so they do not depend on the live DB.
+Render's free filesystem is **ephemeral** — `data/aranya.db` is wiped on redeploy
+and on wake. Calls made during grading persist for that session, which is enough
+for a demo, and the three submitted recordings live in `evidence/recordings/`
+precisely so they never depend on the live DB.
 
-For production this is the point at which SQLite must become Postgres — already
-flagged in `docs/TRADEOFFS.md` §5.
+This is exactly where SQLite must become Postgres for production — already flagged
+in `docs/TRADEOFFS.md` section 5.
 
-## Alternative: Cloudflare Tunnel from this machine
+---
 
-Zero cost, no cold starts, real persistence, and the DB survives:
+## Backup for the final round: Cloudflare Tunnel
+
+Zero cost, no cold start, real persistence — but only while your laptop is on:
 
 ```bash
 winget install Cloudflare.cloudflared
 cloudflared tunnel --url http://localhost:3100
 ```
 
-Gives a public `https://<random>.trycloudflare.com` URL. **The catch: it only
-works while your laptop is on and the tunnel process is running.** For a week-long
-window that is fragile. Use Render as the primary and keep this as a backup for
-the live demo in the final round, where you control the machine.
+Gives a public `https://<random>.trycloudflare.com`. Too fragile for a week-long
+window, ideal for the in-office demo where you control the machine.
