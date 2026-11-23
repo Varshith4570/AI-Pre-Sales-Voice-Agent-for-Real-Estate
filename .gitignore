@@ -1,0 +1,17 @@
+# secrets - never commit
+.env
+
+# dependencies
+node_modules/
+
+# runtime data (ephemeral; the submitted recordings live in evidence/ instead)
+data/
+*.log
+
+# local dev helper: hardcodes a Windows path, not portable
+start-server.vbs
+
+# scratch probe audio
+docs/_*.mp3
+
+# NOTE: evidence/ IS tracked on purpose - it holds the submitted call recordings.

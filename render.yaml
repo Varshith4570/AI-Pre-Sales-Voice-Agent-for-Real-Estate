@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: aranya-voice-agent
+    runtime: node
+    plan: free
+    region: singapore          # closest Render region to Hyderabad
+    buildCommand: npm install
+    startCommand: node src/server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_API_KEY_FALLBACK
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_REGION
+        value: ap-south-1
+      - key: POLLY_VOICE_ID
+        value: Kajal
+      - key: STT_MODEL
+        value: whisper-large-v3-turbo
+      - key: LLM_MODEL
+        value: qwen/qwen3.8-27b

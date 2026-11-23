@@ -1,0 +1,21 @@
+{
+  "name": "aranya-voice-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AI pre-sales voice agent for Aranya Greens, Tellapur - Convey Labs challenge",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "multer": "^2.0.1",
+    "node-edge-tts": "^1.2.12"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Aranya Greens — Talk to Meera</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:16px/1.5 -apple-system,"Segoe UI",Roboto,sans-serif;background:#0f1115;color:#e7e9ee;
+     min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{width:100%;max-width:560px;background:#171a21;border:1px solid #262b36;border-radius:16px;padding:28px}
+h1{font-size:20px;margin-bottom:4px}
+.sub{color:#8b93a7;font-size:13px;margin-bottom:20px}
+.badge{display:inline-block;background:#1d2733;color:#7fb4ff;font-size:11px;padding:3px 9px;
+       border-radius:20px;margin-bottom:14px;letter-spacing:.3px}
+#log{height:300px;overflow-y:auto;background:#0f1115;border:1px solid #262b36;border-radius:10px;
+     padding:14px;margin-bottom:16px;font-size:14px}
+.msg{margin-bottom:12px;display:flex;gap:9px}
+.who{flex:0 0 52px;font-size:11px;color:#8b93a7;padding-top:2px;text-transform:uppercase}
+.txt{flex:1;white-space:pre-wrap}
+.agent .txt{color:#a8d4ff}.caller .txt{color:#e7e9ee}.sys .txt{color:#8b93a7;font-style:italic}
+.row{display:flex;gap:10px}
+button{flex:1;padding:13px;border:0;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer}
+#start{background:#2563eb;color:#fff}#talk{background:#16a34a;color:#fff}
+#talk.rec{background:#dc2626}#end{background:#2b303b;color:#e7e9ee;flex:0 0 90px}
+button:disabled{opacity:.35;cursor:not-allowed}
+.meta{margin-top:14px;font-size:11px;color:#6b7383;display:flex;justify-content:space-between}
+a{color:#7fb4ff}
+</style></head><body>
+<div class="card">
+  <div class="badge">AI ASSISTANT · ARANYA DEVELOPERS</div>
+  <h1>Aranya Greens, Tellapur</h1>
+  <div class="sub">Speak to Meera in Telugu, Hindi or English — mix them freely.</div>
+  <div id="log"><div class="msg sys"><div class="who"></div>
+    <div class="txt">Press Start call, then hold Hold to talk while you speak.</div></div></div>
+  <div class="row">
+    <button id="start">Start call</button>
+    <button id="talk" disabled>Hold to talk</button>
+    <button id="end" disabled>End</button>
+  </div>
+  <div class="meta"><span id="stat">idle</span><a href="/dashboard.html">Call dashboard →</a></div>
+</div>
+<script>
+let callId=null, rec=null, chunks=[], audioEl=new Audio();
+const log=document.getElementById("log"), stat=document.getElementById("stat");
+const bStart=document.getElementById("start"), bTalk=document.getElementById("talk"), bEnd=document.getElementById("end");
+
+function add(who,txt,cls){const d=document.createElement("div");d.className="msg "+cls;
+  d.innerHTML=`<div class="who">${who}</div><div class="txt"></div>`;
+  d.querySelector(".txt").textContent=txt;log.appendChild(d);log.scrollTop=log.scrollHeight;}
+function play(b64){audioEl.src="data:audio/mpeg;base64,"+b64;audioEl.play().catch(()=>{});}
+
+bStart.onclick=async()=>{
+  bStart.disabled=true;stat.textContent="connecting…";
+  const r=await fetch("/api/call/start",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({label:"web"})}).then(r=>r.json());
+  callId=r.callId;add("Meera",r.text,"agent");play(r.audio);
+  stat.textContent="call "+callId;bTalk.disabled=false;bEnd.disabled=false;
+};
+
+async function startRec(){
+  if(!callId||rec)return;
+  const s=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});
+  // Browser-native recording. We send a whole utterance rather than streaming:
+  // Whisper is a batch model, so chunking would only add round-trips, not cut latency.
+  rec=new MediaRecorder(s,{mimeType:"audio/webm"});chunks=[];
+  rec.ondataavailable=e=>chunks.push(e.data);
+  rec.onstop=async()=>{
+    s.getTracks().forEach(t=>t.stop());
+    const blob=new Blob(chunks,{type:"audio/webm"});rec=null;
+    if(blob.size<1200){stat.textContent="too short";return;}   // crude guard against empty uploads
+    stat.textContent="thinking…";
+    const fd=new FormData();fd.append("audio",blob,"turn.webm");
+    const t0=Date.now();
+    const r=await fetch(`/api/call/${callId}/turn`,{method:"POST",body:fd}).then(r=>r.json());
+    if(r.error){add("system","error: "+r.error,"sys");stat.textContent="error";return;}
+    if(r.transcript)add("You",r.transcript,"caller");
+    add("Meera",r.reply,"agent");play(r.audio);
+    stat.textContent=`${Date.now()-t0} ms${r.timing?` (stt ${r.timing.stt} · llm ${r.timing.llm} · tts ${r.timing.tts})`:""}`;
+  };
+  rec.start();bTalk.classList.add("rec");bTalk.textContent="Release to send";stat.textContent="listening…";
+}
+function stopRec(){if(rec&&rec.state==="recording")rec.stop();
+  bTalk.classList.remove("rec");bTalk.textContent="Hold to talk";}
+
+bTalk.addEventListener("mousedown",startRec);bTalk.addEventListener("mouseup",stopRec);
+bTalk.addEventListener("mouseleave",stopRec);
+bTalk.addEventListener("touchstart",e=>{e.preventDefault();startRec();});
+bTalk.addEventListener("touchend",e=>{e.preventDefault();stopRec();});
+
+bEnd.onclick=async()=>{await fetch(`/api/call/${callId}/end`,{method:"POST"});
+  add("system","Call ended. See the dashboard for the transcript.","sys");
+  bTalk.disabled=true;bEnd.disabled=true;bStart.disabled=false;stat.textContent="ended";callId=null;};
+</script></body></html>

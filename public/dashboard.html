@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Aranya — Call Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:15px/1.5 -apple-system,"Segoe UI",Roboto,sans-serif;background:#0f1115;color:#e7e9ee;padding:24px}
+.wrap{max-width:1180px;margin:0 auto}
+h1{font-size:21px;margin-bottom:3px}.sub{color:#8b93a7;font-size:13px;margin-bottom:20px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px}
+.kpi{background:#171a21;border:1px solid #262b36;border-radius:12px;padding:14px}
+.kpi .v{font-size:22px;font-weight:700;color:#7fb4ff}
+.kpi .l{font-size:11px;color:#8b93a7;text-transform:uppercase;letter-spacing:.4px;margin-top:3px}
+h2{font-size:14px;margin:22px 0 10px;color:#8b93a7;text-transform:uppercase;letter-spacing:.5px}
+table{width:100%;border-collapse:collapse;background:#171a21;border:1px solid #262b36;border-radius:12px;overflow:hidden}
+th{background:#1d212a;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#8b93a7;
+   text-align:left;padding:9px 12px}
+td{padding:9px 12px;border-top:1px solid #222733;font-size:13px}
+tr.c{cursor:pointer}tr.c:hover{background:#1c2029}
+.tag{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:700}
+.booked{background:#14341f;color:#4ade80}.qualified{background:#1d2733;color:#7fb4ff}
+.dropped{background:#2b303b;color:#8b93a7}.in_progress{background:#332b14;color:#fbbf24}
+.hot{background:#3a1515;color:#f87171}.warm{background:#332b14;color:#fbbf24}.cold{background:#2b303b;color:#8b93a7}
+#detail{display:none;background:#171a21;border:1px solid #262b36;border-radius:12px;padding:18px;margin-top:16px}
+.t{display:flex;gap:10px;margin-bottom:10px;font-size:13px}
+.t .w{flex:0 0 58px;font-size:10px;color:#8b93a7;text-transform:uppercase;padding-top:2px}
+.t.agent .x{color:#a8d4ff}.lat{font-size:10px;color:#5b6271;margin-left:6px}
+code{background:#0f1115;padding:2px 6px;border-radius:5px;font-size:12px;color:#9ae6b4}
+a{color:#7fb4ff}
+</style></head><body><div class="wrap">
+<h1>Aranya Greens — Call Dashboard</h1>
+<div class="sub">CRM stand-in and post-call view · <a href="/">← back to call page</a></div>
+<div class="kpis" id="kpis"></div>
+<h2>Site visits booked</h2><table id="visits"><thead><tr>
+<th>Name</th><th>Config</th><th>Budget</th><th>Day</th><th>Time</th><th>Status</th><th>Call</th>
+</tr></thead><tbody></tbody></table>
+<h2>Calls — click a row for the full transcript</h2><table id="calls"><thead><tr>
+<th>ID</th><th>Started</th><th>Outcome</th><th>Intent</th><th>Turns</th><th>Captured</th><th>Cost</th>
+</tr></thead><tbody></tbody></table>
+<div id="detail"></div>
+</div>
+<script>
+const INR=84.5, fmt=t=>new Date(t).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"});
+const tag=(v,c)=>`<span class="tag ${c||v}">${v||"—"}</span>`;
+
+async function load(){
+  const [e,calls,visits]=await Promise.all(
+    ["/api/economics","/api/calls","/api/visits"].map(u=>fetch(u).then(r=>r.json())));
+
+  document.getElementById("kpis").innerHTML=[
+    [e.calls??0,"Calls completed"],
+    [e.booked??0,"Site visits booked"],
+    ["Rs "+(e.avgCallInr??0).toFixed(2),"Avg cost / call"],
+    [e.costPerBookedVisitInr?("Rs "+e.costPerBookedVisitInr.toFixed(2)):"—","Cost / booked visit"],
+    [Math.round(e.latency?.total??0)+" ms","Avg turn latency"],
+    [Math.round(e.avg_secs??0)+" s","Avg caller audio"],
+  ].map(([v,l])=>`<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+
+  document.querySelector("#visits tbody").innerHTML = visits.length
+    ? visits.map(v=>`<tr><td>${v.name??"—"}</td><td>${v.config??"—"}</td><td>${v.budget??"—"}</td>
+        <td>${v.visit_day??"—"}</td><td>${v.visit_time??"—"}</td><td>${tag(v.status,"booked")}</td>
+        <td><code>${v.call_id}</code></td></tr>`).join("")
+    : `<tr><td colspan="7" style="color:#8b93a7">No site visits booked yet.</td></tr>`;
+
+  document.querySelector("#calls tbody").innerHTML = calls.map(c=>{
+    const cap=JSON.parse(c.captured_json||"{}");
+    const cost=(c.cost_stt_usd+c.cost_llm_usd+c.cost_tts_usd)*INR;
+    return `<tr class="c" data-id="${c.id}"><td><code>${c.id}</code></td><td>${fmt(c.started_at)}</td>
+      <td>${tag(c.outcome)}</td><td>${tag(c.intent||"—",c.intent||"cold")}</td><td>${c.turns}</td>
+      <td style="color:#8b93a7;font-size:12px">${Object.entries(cap).map(([k,v])=>k+": "+v).join(" · ")||"—"}</td>
+      <td>Rs ${cost.toFixed(2)}</td></tr>`;}).join("");
+
+  document.querySelectorAll("tr.c").forEach(tr=>tr.onclick=()=>show(tr.dataset.id));
+}
+
+async function show(id){
+  const c=await fetch("/api/calls/"+id).then(r=>r.json());
+  const d=document.getElementById("detail");d.style.display="block";
+  d.innerHTML=`<h2 style="margin-top:0">Transcript · <code>${id}</code> · ${tag(c.outcome)}</h2>
+    <div style="color:#8b93a7;font-size:12px;margin-bottom:14px">
+      Captured: ${JSON.stringify(c.captured)} ${c.notes?` · <span style="color:#f87171">${c.notes}</span>`:""}</div>`
+    + c.turns.map(t=>`<div class="t ${t.role==="agent"?"agent":""}">
+        <div class="w">${t.role==="agent"?"Meera":"Caller"}</div>
+        <div class="x">${t.text}${t.total_ms?`<span class="lat">${t.total_ms} ms`
+          +(t.stt_ms?` · stt ${t.stt_ms}`:"")+(t.llm_ms?` · llm ${t.llm_ms}`:"")
+          +(t.tts_ms?` · tts ${t.tts_ms}`:"")+`</span>`:""}
+          ${t.detected_lang?`<span class="lat">[${t.detected_lang}]</span>`:""}</div></div>`).join("");
+  d.scrollIntoView({behavior:"smooth"});
+}
+load(); setInterval(load, 10000);
+</script></body></html>
