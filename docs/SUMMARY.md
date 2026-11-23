@@ -1,4 +1,4 @@
-# Summary — AI Pre-Sales Voice Agent for Aranya Developers
+# Summary - AI Pre-Sales Voice Agent for Aranya Developers
 
 **Dyapa Varshith Reddy** · varshithreddy4570@gmail.com · +91 7386309294
 Submitted for the Convey Labs Forward Deployed Backend Engineer challenge.
@@ -25,11 +25,11 @@ costed per turn, and scored hot/warm/cold.
 |---|---|---|
 | 1 | **Summary document** | this file |
 | 2 | **Working agent** | `<LIVE_URL>` — call page at `/`, dashboard at `/dashboard.html` |
-| 3 | **Call recordings (3, incl. a failure)** | [`evidence/recordings/`](../evidence/recordings/README.md) |
+| 3 | **Call recordings (3, incl. a failure)** | Attached to this email: `6_Call_Recordings_Transcripts.pdf` + `7_Call_Audio.zip` |
 | 4 | **Code + README** | `<REPO_URL>` — [`README.md`](../README.md), runs with `npm install && npm start` |
-| 5 | **Economics memo** | [`docs/ECONOMICS.md`](ECONOMICS.md) |
-| 6 | **Tradeoffs note** | [`docs/TRADEOFFS.md`](TRADEOFFS.md) |
-| 7 | **Note to Rohit** | [`docs/NOTE_TO_ROHIT.md`](NOTE_TO_ROHIT.md) |
+| 5 | **Economics memo** | Attached: `2_Economics_Memo.pdf` |
+| 6 | **Tradeoffs note** | Attached: `3_Tradeoffs_Note.pdf` |
+| 7 | **Note to Rohit** | Attached: `4_Note_to_Rohit.pdf` |
 | 8 | **Walkthrough video (5 min)** | `<VIDEO_URL>` |
 
 Supporting evidence, all measured by me:
