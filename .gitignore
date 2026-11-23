@@ -15,3 +15,6 @@ start-server.vbs
 docs/_*.mp3
 
 # NOTE: evidence/ IS tracked on purpose - it holds the submitted call recordings.
+
+# local deployment notes - not part of the submission
+DEPLOY.md
